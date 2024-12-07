@@ -1,0 +1,17 @@
+[project]
+name = "enforcer"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Ehsanul Hoque", email = "ehsanul@ehsanul.com"},
+]
+dependencies = [
+    "reolinkapi>=0.1.5",
+]
+requires-python = "==3.8.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
