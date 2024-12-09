@@ -6,9 +6,9 @@ authors = [
     {name = "Ehsanul Hoque", email = "ehsanul@ehsanul.com"},
 ]
 dependencies = [
-    "reolinkapi>=0.1.5",
+    "opencv-python>=4.10.0.84",
 ]
-requires-python = "==3.8.*"
+requires-python = ">=3.12.4"
 readme = "README.md"
 license = {text = "MIT"}
 
