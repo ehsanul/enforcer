@@ -29,7 +29,10 @@ def load_session_frames(capture_dir):
 
 capture_dir = argv[1]
 frames = load_session_frames(capture_dir)
-model = YOLO("yolo11n-seg.pt")
+model = YOLO("yolo11n.pt")
+
+moving_avg_tv_box = None #np.array([0, 0, 0, 0])
+
 for frame in frames:
     #time.sleep(0.2)
     #cv2.imshow("frame", frame)
@@ -37,13 +40,15 @@ for frame in frames:
     # Run YOLO inference on the frame
     results = model(frame)
 
+    tv_boxes = []
+
     # Visualize the results on the frame
     for r in results:
         annotated_frame = r.plot()
 
         # Display the annotated frame
         cv2.imshow("window", annotated_frame)
-        time.sleep(0.5)
+        time.sleep(0.8)
 
         """
         for mask in r.masks:
@@ -62,32 +67,57 @@ for frame in frames:
         """
 
         img = np.copy(r.orig_img)
-        # Iterate each object contour 
+        # Iterate each detection
         for ci, c in enumerate(r):
             label = c.names[c.boxes.cls.tolist().pop()]
             if label != "tv":
                 continue
-            time.sleep(0.5)
 
-            b_mask = np.zeros(img.shape[:2], np.uint8)
+            for box in c.boxes.xyxy.cpu().numpy():
+                tv_boxes.append(box)
+                # Crop object from original image
 
-            # Create contour mask 
-            contour = c.masks.xy.pop().astype(np.int32).reshape(-1, 1, 2)
-            _ = cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
+            # b_mask = np.zeros(img.shape[:2], np.uint8)
 
-            # Choose one:
+            # # Create contour mask 
+            # contour = c.masks.xy.pop().astype(np.int32).reshape(-1, 1, 2)
+            # _ = cv2.drawContours(b_mask, [contour], -1, (255, 255, 255), cv2.FILLED)
 
-            # OPTION-1: Isolate object with black background
-            mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
-            isolated = cv2.bitwise_and(mask3ch, img)
 
-            # # OPTION-2: Isolate object with transparent background (when saved as PNG)
-            # isolated = np.dstack([img, b_mask])
+            # # Choose one:
 
-            # # OPTIONAL: detection crop (from either OPT1 or OPT2)
+            # # OPTION-1: Isolate object with black background
+            # mask3ch = cv2.cvtColor(b_mask, cv2.COLOR_GRAY2BGR)
+            # isolated = cv2.bitwise_and(mask3ch, img)
+
+            # # # OPTION-2: Isolate object with transparent background (when saved as PNG)
+            # # isolated = np.dstack([img, b_mask])
+
+            # # # OPTIONAL: detection crop (from either OPT1 or OPT2)
             # x1, y1, x2, y2 = c.boxes.xyxy.cpu().numpy().squeeze().astype(np.int32)
             # iso_crop = isolated[y1:y2, x1:x2]
-            cv2.imshow("isolated", isolated)
+            # cv2.imshow("isolated", isolated)
+
+    if len(tv_boxes) == 1:
+        found_box = tv_boxes[0]
+    if len(tv_boxes) > 1:
+        # union the boxes, maximize the area
+        for box in tv_boxes[1:]:
+            found_box = np.array([
+                min(found_box[0], box[0]),
+                min(found_box[1], box[1]),
+                max(found_box[2], box[2]),
+                max(found_box[3], box[3])
+            ])
+
+    if (moving_avg_tv_box is None and len(tv_boxes) > 0):
+        moving_avg_tv_box = found_box
+    elif len(tv_boxes) > 0:
+        moving_avg_tv_box = 0.8 * moving_avg_tv_box + 0.2 * found_box
+
+    box = moving_avg_tv_box 
+    crop_obj = img[int(box[1]) : int(box[3]), int(box[0]) : int(box[2])]
+    cv2.imshow(f"cropped", crop_obj)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
